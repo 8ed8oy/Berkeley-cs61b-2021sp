@@ -13,7 +13,6 @@ public class Game {
         _source = source;
         _playing = true;
     }
-
     /** Return true iff we have not received a Quit command. */
     boolean playing() {
         return _playing;
