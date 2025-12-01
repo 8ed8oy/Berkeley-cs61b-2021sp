@@ -85,13 +85,13 @@ public class Board implements Iterable<Tile> {
      *
      * Returns whether or not this move is a merge.
      * */
-    public boolean move(int col, int row, Tile tile) {
+    public boolean move(int col, int row, Tile tile) {/**row0在最下方*/
         int pcol = viewPerspective.col(col, row, size()),
                 prow = viewPerspective.row(col, row, size());
         if (tile.col() == pcol && tile.row() == prow) {
             return false;
         }
-        Tile tile1 = vtile(col, row, viewPerspective);
+        Tile tile1 = vtile(col, row, viewPerspective); /**提取要移动到的块的值*/
         values[tile.col()][tile.row()] = null;
 
         if (tile1 == null) {

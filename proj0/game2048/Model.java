@@ -121,6 +121,34 @@ public class Model extends Observable {
         return changed;
     }
 
+    public void tilt_col(int col, Side side) {
+        int size = board.size();
+        board.setViewingPerspective(side);
+        boolean[] merged = new boolean[size];
+        for (int row = size - 2; row >= 0; row--) {
+            Tile t = board.tile(col, row);
+            if (t == null) continue;
+
+            int target_row = row;
+            for (int r = row + 1; r < size; r++) {
+                Tile nextTile = board.tile(col, r);
+                if (nextTile == null) {
+                    target_row = r;
+                } else if (nextTile.value() == t.value() && !merged[r]) {
+                    target_row = r;
+                    merged[r] = true;
+                    score += t.value() * 2;
+                    break;
+                } else {
+                    break;
+                }
+            }
+            if (target_row != row) {
+                board.move(col, target_row, t);
+            }
+        }
+    }
+
     /** Checks if the game is over and sets the gameOver variable
      *  appropriately.
      */
