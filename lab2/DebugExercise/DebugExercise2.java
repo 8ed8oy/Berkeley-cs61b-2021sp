@@ -4,7 +4,7 @@ package DebugExercise;
  * Exercise to showcase the step over button.
  * Code adapted from https://stackoverflow.com/questions/4895173/bitwise-multiply-and-add-in-java and https://stackoverflow.com/questions/1533131/what-useful-bitwise-operator-code-tricks-should-a-developer-know-about
  */
-public class DebugExercise2 {    /** problematic max function */
+public class DebugExercise2 {    /** max function fixed */
     /** Returns the max of a and b. Do not step into this function. */
     public static int max(int a, int b) {
         int max = a;
@@ -20,17 +20,7 @@ public class DebugExercise2 {    /** problematic max function */
         int x = a, y = b;
         /* If you're stepping into this function, click the
            step out button because you're not going to learn anything. */
-        int xor, and, temp;
-        and = x & y;
-        xor = x ^ y;
-
-        while (and != 0) {
-            and <<= 1;
-            temp = xor ^ and;
-            and &= xor;
-            xor = temp;
-        }
-        return xor;
+        return x + y;
     }
 
     /** Returns a new array where entry i is the max of
