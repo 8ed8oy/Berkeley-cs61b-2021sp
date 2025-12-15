@@ -11,7 +11,7 @@ public class ArrayDeque<T> implements Deque<T> {
         size = 0;
         items = (T[]) new Object[8];
         nextFirst = 0;
-        nextLast = 0;
+        nextLast = 1;
     }
 
     @Override
@@ -21,6 +21,9 @@ public class ArrayDeque<T> implements Deque<T> {
 
     @Override
     public T get(int index){
+        if (index < 0 || index >= size) {
+            return null;
+        }
         return items[(index + nextFirst + 1) % items.length];
     }
 
@@ -55,8 +58,8 @@ public class ArrayDeque<T> implements Deque<T> {
         if (size == items.length) {
             resize(size * 2, nextFirst, nextLast);
         }
-        nextFirst = (nextFirst - 1 + items.length) % items.length;
         items[nextFirst] = item;
+        nextFirst = (nextFirst - 1 + items.length) % items.length;
         size++;
     }
 
@@ -65,9 +68,10 @@ public class ArrayDeque<T> implements Deque<T> {
         if (isEmpty()) {
             return null;
         }
-        T item = items[nextFirst];
-        items[nextFirst] = null;
-        nextFirst = (nextFirst + 1) % items.length;
+        int firstIndex = (nextFirst + 1) % items.length;
+        T item = items[firstIndex];
+        items[firstIndex] = null;
+        nextFirst = firstIndex;
         size--;
         if (size < items.length / 4 && items.length > 8) {
             resize(items.length / 2, nextFirst, nextLast);
@@ -128,12 +132,12 @@ public class ArrayDeque<T> implements Deque<T> {
         if (this == o) {
             return true;
         }
-        if (!(o instanceof ArrayDeque)) {
+        if (!(o instanceof Deque)) {
             return false;
         }
 
-        ArrayDeque<?> that = (ArrayDeque<?>) o;
-        if (this.size != that.size) {
+        Deque<?> that = (Deque<?>) o;
+        if (this.size() != that.size()) {
             return false;
         }
         for (int i = 0; i < this.size; i++) {
