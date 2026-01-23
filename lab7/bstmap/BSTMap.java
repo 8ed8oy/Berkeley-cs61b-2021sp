@@ -3,7 +3,7 @@ package bstmap;
 import java.util.Iterator;
 import java.util.Stack;
 
-public class BSTMap<K, V> implements Map61B<K, V> {
+public class BSTMap<K extends Comparable<? super K>, V> implements Map61B<K, V> {
     int size = 0;
     private BSTNode root = null;
 
@@ -17,7 +17,6 @@ public class BSTMap<K, V> implements Map61B<K, V> {
         V value;
         BSTNode left;
         BSTNode right;
-        int size;
     }
 
     @Override
@@ -28,23 +27,33 @@ public class BSTMap<K, V> implements Map61B<K, V> {
 
     @Override
     public boolean containsKey(K key) {
-        return get(key) != null;
+        BSTNode curr = root;
+        while (curr != null) {
+            int cmp = curr.key.compareTo(key);
+            if (cmp > 0) {
+                curr = curr.left;
+            } else if (cmp < 0) {
+                curr = curr.right;
+            } else {
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
     public V get(K key) {
-        BSTNode currentNode = root;
-        return getHelper(currentNode, key);
+        return getHelper(root, key);
     }
 
     private V getHelper(BSTNode node, K key) {
         if (node == null) {
             return null;
         }
-        int cmp = ((Comparable<K>) key).compareTo(node.key);
-        if (cmp < 0) {
+        int cmp = node.key.compareTo(key);
+        if (cmp > 0) {
             return getHelper(node.left, key);
-        } else if (cmp > 0) {
+        } else if (cmp < 0) {
             return getHelper(node.right, key);
         } else {
             return node.value;
@@ -58,19 +67,20 @@ public class BSTMap<K, V> implements Map61B<K, V> {
 
     @Override
     public void put(K key, V value) {
-        BSTNode currentNode = root;
-        putHelper(currentNode, key, value);
-        size += 1;
+        if (!containsKey(key)) {
+            size += 1;
+        }
+        root = putHelper(root, key, value);
     }
 
     private BSTNode putHelper(BSTNode node, K key, V value) {
         if (node == null) {
             return new BSTNode(key, value);
         }
-        int cmp = ((Comparable<K>) key).compareTo(node.key);
-        if (cmp < 0) {
+        int cmp = node.key.compareTo(key);
+        if (cmp > 0) {
             node.left = putHelper(node.left, key, value);
-        } else if (cmp > 0) {
+        } else if (cmp < 0) {
             node.right = putHelper(node.right, key, value);
         } else {
             node.value = value;
