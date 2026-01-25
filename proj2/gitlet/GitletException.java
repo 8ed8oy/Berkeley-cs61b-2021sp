@@ -17,4 +17,11 @@ class GitletException extends RuntimeException {
         super(msg);
     }
 
+    public static void validateNumArgs(String cmd, String[] args, int n) {
+        if (args.length != n) {
+            throw new RuntimeException(
+                    String.format("Invalid number of arguments for: %s.", cmd));
+        }
+    }
+
 }

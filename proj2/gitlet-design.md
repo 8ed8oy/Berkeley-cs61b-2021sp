@@ -1,23 +1,41 @@
 # Gitlet Design Document
 
-**Name**:
+**Name**:Fangheng Wang
 
 ## Classes and Data Structures
 
-### Class 1
+### Main
 
 #### Fields
 
-1. Field 1
-2. Field 2
 
 
-### Class 2
+### commit
+* Massage - contains the commit message
+* Time - contains the time a commit was made
+* Parent - the parent commit of a commit object
 
 #### Fields
 
-1. Field 1
-2. Field 2
+
+
+### Repository
+
+#### Fields
+
+
+
+### Utils
+
+#### Fields
+
+
+
+### GitletEception
+
+### Dumpable
+
+### DumpObject
 
 
 ## Algorithms
