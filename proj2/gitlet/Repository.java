@@ -27,10 +27,8 @@ public class Repository {
     public static final File REFS_DIR = join(GITLET_DIR, "refs");
     public static final File HEADS_DIR = join(GITLET_DIR, "heads");
     public static final File HEAD_FILE = join(GITLET_DIR, "HEAD");
-    private String head;
+    public static final File INDEX_FILE = join(GITLET_DIR, "index");
 
-    /* TODO: fill in the rest of this class. */
-    @SuppressWarnings("ResultOfMethodCallIgnored")
     public static void init() {
         if (GITLET_DIR.exists()) {
             System.out.println("A Gitlet version-control system already exists in the current directory.");
@@ -56,4 +54,25 @@ public class Repository {
         // set HEAD to master
         writeContents(HEAD_FILE, "master");
     }
+
+    public static void add(String fileName) {
+        File fileToAdd = join(CWD, fileName);
+
+        if (!fileToAdd.exists()) {
+            System.out.println("File does not exist.");
+            return;
+        }
+
+        StagingArea stagingArea = StagingArea.fromFile();
+        stagingArea.add(fileName);
+        stagingArea.save();
+    }
+
+    public static File getHeadCommitFile() {
+        String currentBranch = readContentsAsString(HEAD_FILE);
+        File branchFile = join(HEADS_DIR, currentBranch);
+        String headCommitID = readContentsAsString(branchFile);
+        return join(COMMITS_DIR, headCommitID);
+    }
+
 }

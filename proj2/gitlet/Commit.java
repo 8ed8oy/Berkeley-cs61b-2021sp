@@ -2,44 +2,47 @@ package gitlet;
 
 // TODO: any imports you need here
 
+import net.sf.saxon.functions.Serialize;
 import org.checkerframework.checker.units.qual.C;
 
+import java.io.File;
 import java.io.Serializable;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+
+import static gitlet.Utils.serialize;
 
 /** Represents a gitlet commit object.
- *  TODO: It's a good idea to give a description here of what else this Class
- *  does at a high level.
- *
- *  @author TODO
+ * Commits have a message, a timestamp, a parent commit, and UID.
+ * A commit includes UIDs of all files tracked in the commit using HashMap.
+ * key: file name, value: file's blobs UID.
+ *  @author Fangheng Wang
  */
 public class Commit implements Serializable {
-    /**
-     * TODO: add instance variables here.
-     *
-     * List all instance variables of the Commit class here with a useful
-     * comment above them describing what that variable represents and how that
-     * variable is used. We've provided one example for `message`.
-     */
-
-    /** The message of this Commit. */
     private String message;
     private String timestamp;
     private String parent;
-    private int UID;
-    String branch;
-
-    /* TODO: fill in the rest of this class. */
+    private HashMap<String, String> blobsID = new HashMap<>();
 
     public Commit (String massage, String parent) {
         this.message = massage;
         if (parent == null) {
             this.timestamp = "00:00:00 UTC, Thursday, 1 January 1970";
-            this.branch = "master";
         } else {
             this.timestamp = new Date().toString();
         }
         this.parent = parent;
+    }
+
+    public void save(){
+        String commitID = Utils.sha1(serialize(this));
+        File commitFile = Utils.join(Repository.COMMITS_DIR, commitID);
+        Utils.writeObject(commitFile, this);
+    }
+
+    public HashMap<String, String> getBlobsID() {
+        return this.blobsID;
     }
 
     public  String getMessage() {
@@ -50,7 +53,7 @@ public class Commit implements Serializable {
         return this.timestamp;
     }
 
-    public Commit getParent() {
+    public String getParent() {
         return this.parent;
     }
 }
