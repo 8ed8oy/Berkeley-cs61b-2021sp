@@ -29,7 +29,12 @@ public class Main {
                 Repository.add(args[1]);
                 break;
             case "commit":
-
+                if (args.length < 2 || args[1].trim().isEmpty()) {
+                    System.out.println("Please enter a commit message.");
+                    return;
+                }
+                validateNumArgs("commit", args, 2);
+                Repository.commit(args[1]);
                 break;
             case "rm":
 

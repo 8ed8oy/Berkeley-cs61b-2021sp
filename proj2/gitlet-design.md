@@ -11,12 +11,13 @@
 
 
 ### commit
-* Massage - contains the commit message
-* Time - contains the time a commit was made
-* Parent - the parent commit of a commit object
+- Massage : contains the commit message
+- Time : contains the time a commit was made
+- Parent : the parent commit of a commit object
+- Blob : a mapping of file names to blob ids
 
 #### Fields
-
+- `Save` () : Serializes and saves the commit object to disk.
 
 
 ### Repository
@@ -27,17 +28,22 @@
 
 ### StagingArea
 
-#### Fields
+**Responsibilities**: Manages files staged for addition or removal. Persisted at `.gitlet/index`.
 
-1.  `addedFiles` (`Map<String, String>`):
-    *   **Key**: The relative file path.
-    *   **Value**: The SHA-1 hash of the file content (Blob ID).
-    *   **Purpose**: Tracks files that have been staged for addition or modification.
-2.  `removedFiles` (`Set<String>`):
-    *   **Key**: The relative file path.
-    *   **Purpose**: Tracks files that have been staged for removal.
+**Fields**:
+- `addedFiles (Map<String, String>)`: Filename -> Blob Hash.
+- `removedFiles (Set<String>)`: Filenames marked for removal.
+
+**Core Methods**:
+- `add(String filename)`:
+    1. Hash file content.
+    2. Remove from `removedFiles` if present.
+    3. If hash differs from current commit, update `addedFiles`; otherwise remove from stage.
+    4. Persist Blob and Index.
+
 
 ### Utils
+- UID_LENGTH : the length of the unique identifier, which is 40.
 
 #### Fields
 
@@ -76,3 +82,25 @@
     *   Loaded from disk at the start of any command that manipulates the stage.
     *   Saved back to disk immediately after modification.
     *   Better than saved in separate directory because it simplifies management and reduces file clutter.
+
+## Testing Plan
+
+### Use-Case Scenarios
+
+Here we outline the integration tests for key commands.
+
+#### 1. `init`
+| Scenario | Steps | Expected Outcome |
+| :--- | :--- | :--- |
+| **Basic Init** | 1. `init` | 1. `.gitlet` directory created.<br>2. Initial commit created (verify via log or file check). |
+| **Re-Init** | 1. `init`<br>2. `init` | Output: "A Gitlet version-control system already exists in the current directory." |
+
+#### 2. `add`
+| Scenario | Steps | Expected Outcome |
+| :--- | :--- | :--- |
+| **Add New File** | 1. Create `wug.txt`<br>2. `add wug.txt` | File added to `.gitlet/index` (staging). Blob created in `.gitlet/objects`. |
+| **Unchange** | 1. `add wug.txt` (same content as HEAD) | File removed from staging area if previously staged. Not marked for addition. |
+| **Override Staging** | 1. `add wug.txt` (v1)<br>2. Modify `wug.txt` (v2)<br>3. `add wug.txt` | Blob for v2 replaces v1 in staging. |
+| **Un-Remove** | 1. `rm wug.txt`<br>2. `add wug.txt` | File removed from `removedFiles` set. |
+| **Missing File** | 1. `add doesnotexist.txt` | Output: "File does not exist." |
+

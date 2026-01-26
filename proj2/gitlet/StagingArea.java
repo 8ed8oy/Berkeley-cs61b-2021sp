@@ -25,7 +25,6 @@ public class StagingArea implements Serializable {
 
     /**
      * Adds a file to the staging area with the potential for addition or modification.
-     * <p>
      * Logic flow:
      * 1. Reads the file from disk (Computing the Blob).
      * 2. Compares with the current commit .
@@ -61,6 +60,11 @@ public class StagingArea implements Serializable {
         }
 
         addedFiles.put(fileName, blobsID);
+        save();
+    }
+
+    public  boolean isEmpty() {
+        return addedFiles.isEmpty() && removedFiles.isEmpty();
     }
 
     // Save the current staging area to the index file
@@ -83,6 +87,15 @@ public class StagingArea implements Serializable {
     public void clear() {
         addedFiles.clear();
         removedFiles.clear();
+        save();
+    }
+
+    public Map<String, String> getAddedFiles() {
+        return this.addedFiles;
+    }
+
+    public Set<String> getRemovedFiles() {
+        return this.removedFiles;
     }
 
 }

@@ -1,10 +1,5 @@
 package gitlet;
 
-// TODO: any imports you need here
-
-import net.sf.saxon.functions.Serialize;
-import org.checkerframework.checker.units.qual.C;
-
 import java.io.File;
 import java.io.Serializable;
 import java.util.Date;
@@ -55,5 +50,9 @@ public class Commit implements Serializable {
 
     public String getParent() {
         return this.parent;
+    }
+
+    public void setBlobsID(HashMap<String, String> blobsID) {
+        this.blobsID = blobsID;
     }
 }
