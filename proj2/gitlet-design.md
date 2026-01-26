@@ -34,18 +34,11 @@
 - `addedFiles (Map<String, String>)`: Filename -> Blob Hash.
 - `removedFiles (Set<String>)`: Filenames marked for removal.
 
-**Core Methods**:
-- `add(String filename)`:
-    1. Hash file content.
-    2. Remove from `removedFiles` if present.
-    3. If hash differs from current commit, update `addedFiles`; otherwise remove from stage.
-    4. Persist Blob and Index.
-
 
 ### Utils
 - UID_LENGTH : the length of the unique identifier, which is 40.
 
-#### Fields
+**Fields**:
 
 
 
@@ -72,6 +65,25 @@
 1. Load the current `StagingArea` from disk.
 2. Invoke `StagingArea.add(fileName)`.
 3. Save the `StagingArea` to disk.
+
+### Repository.commit(String message)
+* 1. Check if repository is initialized.
+* 2. Check if the commit message is not null.
+* 3. Load staging area from the index file.
+* 4. If there are no changes staged for commit, give warning and return.
+* 5. Create a new commit object with the given message and the current head commit as its parent.
+* 6. Apply staging area changes to new commit's blobsID
+* 7. Point the current branch to the new commit.
+* 8. Clear the staging area.
+
+### Reposity.rm(String fileName)
+* 1. Check if repository is initialized.
+* 2. Load the current staging area from the index file.
+* 3. Check if the file is staged for addition or tracked in the current commit.
+*    - If both not, print warning and return.
+*    - If staged for addition, unstage it.
+*    - If tracked in current commit, mark it for removal and delete from working directory.
+* 4. Save the updated staging area back to the index file.
 
 ## Persistence
 

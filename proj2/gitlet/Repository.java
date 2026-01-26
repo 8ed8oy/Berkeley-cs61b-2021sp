@@ -137,6 +137,41 @@ public class Repository {
         stagingArea.clear();
     }
 
+    /** Logic flow:
+     * 1. Check if repository is initialized.
+     * 2. Load the current staging area from the index file.
+     * 3. Check if the file is staged for addition or tracked in the current commit.
+     *    - If both not, print warning and return.
+     *    - If staged for addition, unstage it.
+     *    - If tracked in current commit, mark it for removal and delete from working directory.
+     4. Save the updated staging area back to the index file.
+     * @param fileName
+     */
+    public static void rm(String fileName) {
+        checkInitialized();
+
+        StagingArea stagingArea = StagingArea.fromFile();
+        Commit headCommit = Utils.readObject(getHeadCommitFile(), Commit.class);
+        boolean isStaged = stagingArea.getAddedFiles().containsKey(fileName);
+        boolean isTracked = headCommit.getBlobsID().containsKey(fileName);
+
+        if (!isStaged && !isTracked) {
+            System.out.println("No reason to remove the file.");
+            return;
+        }
+
+        if (isStaged) {
+            stagingArea.getAddedFiles().remove(fileName);
+        } else if (isTracked) {
+            stagingArea.getRemovedFiles().add(fileName);
+            File fileToDelete = join(CWD, fileName);
+            if (fileToDelete.exists()) {
+                Utils.restrictedDelete(fileToDelete);
+            }
+        }
+        stagingArea.save();
+    }
+
     /** Update the current branch to point to the new commit ID.
      * @param newCommitID
      */
