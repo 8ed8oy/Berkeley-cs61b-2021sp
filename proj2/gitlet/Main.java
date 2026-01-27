@@ -72,10 +72,12 @@ public class Main {
                 Repository.branch(args[1]);
                 break;
             case "rm-branch":
-
+                validateNumArgs("rm-branch", args, 2);
+                Repository.rmBranch(args[1]);
                 break;
             case "reset":
-
+                validateNumArgs("reset", args, 2);
+                Repository.reSet(args[1]);
                 break;
             case "merge":
 

@@ -349,37 +349,19 @@ public class Repository {
 
     /**
      * Find commitID globally in COMMITS_DIR.
-     * @param commitID
+     * @param shortCommitID
      * @param fileName
      */
-    public static void checkoutFileFromCommit(String commitID, String fileName){
+    public static void checkoutFileFromCommit(String shortCommitID, String fileName){
         checkInitialized();
-//        Commit headCommit = Utils.readObj ect(getHeadCommitFile(), Commit.class);
-//        while (!Utils.sha1(Utils.serialize(headCommit)).startsWith(commitID)) {
-//            String parentID = headCommit.getParent();
-//            if (parentID == null) {
-//                System.out.println("No commit with that id exists.");
-//                return;
-//            }
-//            headCommit = Utils.readObject(join(COMMITS_DIR, parentID), Commit.class);
-//        }
-        if (commitID == null || commitID.isEmpty()) {
+        if (shortCommitID == null || shortCommitID.isEmpty()) {
             System.out.println("No commit with that id exists.");
             return;
         }
         List<String> commitIDs = Utils.plainFilenamesIn(COMMITS_DIR);
 
-        String findCommitID = null;
-        for (String id : commitIDs) {
-            if (id.startsWith(commitID)) {
-                findCommitID = id;
-                break;
-            }
-        }
-        if (findCommitID == null) {
-            System.out.println("No commit with that id exists.");
-            return;
-        }
+        String findCommitID = getFullCommitID(shortCommitID, commitIDs);
+        if (findCommitID == null) return;
         File commitFile = join(COMMITS_DIR, findCommitID);
         Commit findCommit = Utils.readObject(commitFile, Commit.class);
         backupFile(findCommit, fileName);
@@ -415,35 +397,8 @@ public class Repository {
         File commitFile = join(COMMITS_DIR, commitID);
         Commit commit = readObject(commitFile, Commit.class);
 
-        Commit currentCommit = readObject(getHeadCommitFile(), Commit.class);
-        Map<String, String> currentBlobs = currentCommit.getBlobsID();
-        Map<String, String> targetBlobs = commit.getBlobsID();
-        if (targetBlobs == null) targetBlobs = new HashMap<>(); // Standardize null as empty
-        if (currentBlobs == null) currentBlobs = new HashMap<>();
-
-        // Check for untracked files strictly
-        List<String> workingFiles = listWorkingFiles();
-        for (String fileName : workingFiles) {
-            boolean isTrackedCurrent = currentBlobs.containsKey(fileName);
-            boolean isInTarget = targetBlobs.containsKey(fileName);
-            // If untracked in current, and present in target (would be overwritten)
-            if (!isTrackedCurrent && isInTarget) {
-                System.out.println("There is an untracked file in the way; " +
-                                   "delete it, or add and commit it first.");
-                return;
-            }
-        }
-
-        // Checkout files from target commit
-        for(String fileName : targetBlobs.keySet()){
-            backupFile(commit, fileName);
-        }
-
-        // Delete files tracked in current but not in target
-        for (String fileName : currentBlobs.keySet()) {
-            if (!targetBlobs.containsKey(fileName)) {
-                Utils.restrictedDelete(join(CWD, fileName));
-            }
+        if (!checkoutTree(commit)) {
+            return;
         }
 
         writeContents(HEAD_FILE, branchName);
@@ -465,6 +420,50 @@ public class Repository {
         File headCommitFile = getHeadCommitFile();
         String headCommitID = readContentsAsString(headCommitFile);
         writeContents(branchFile, headCommitID);
+    }
+
+    public static void rmBranch(String branchName){
+        checkInitialized();
+        if (branchName == null || branchName.isEmpty()) {
+            System.out.println("Branch name cannot be empty.");
+            return;
+        }
+        File branchFile = join(HEADS_DIR, branchName);
+        if (!branchFile.exists()) {
+            System.out.println("A branch with that name does not exist.");
+            return;
+        }
+        String currentBranch = readContentsAsString(HEAD_FILE);
+        if (currentBranch.equals(branchName)) {
+            System.out.println("Cannot remove the current branch.");
+            return;
+        }
+        Utils.restrictedDelete(branchFile);
+    }
+
+    public static void reSet(String commitIDToReset) {
+        checkInitialized();
+        if (commitIDToReset == null || commitIDToReset.isEmpty()) {
+            System.out.println("No commit with that id exists.");
+            return;
+        }
+        List<String> commitIDs = Utils.plainFilenamesIn(COMMITS_DIR);
+        String findCommitID = getFullCommitID(commitIDToReset, commitIDs);
+        if (findCommitID == null) return;
+
+        File commitFile = join(COMMITS_DIR, findCommitID);
+        Commit targetCommit = Utils.readObject(commitFile, Commit.class);
+
+        if (!checkoutTree(targetCommit)) {
+            return;
+        }
+
+        String currentBranch = readContentsAsString(HEAD_FILE);
+        File branchHeadFile = join(HEADS_DIR, currentBranch);
+        writeContents(branchHeadFile, findCommitID);
+
+        StagingArea stagingArea = StagingArea.fromFile();
+        stagingArea.clear();
     }
 
     /*****************************************************************************************/
@@ -571,5 +570,56 @@ public class Repository {
                 out.add(relPath);
             }
         }
+    }
+
+    private static String getFullCommitID(String commitID, List<String> commitIDs) {
+        String findCommitID = null;
+        for (String id : commitIDs) {
+            if (id.startsWith(commitID)) {
+                findCommitID = id;
+                break;
+            }
+        }
+        if (findCommitID == null) {
+            System.out.println("No commit with that id exists.");
+            return null;
+        }
+        return findCommitID;
+    }
+
+    /** Checkout all files in the target commit to the working directory.
+     * @param targetCommit
+     * @return true if checkout is successful, false if there are untracked files in the way.
+     */
+    private static boolean checkoutTree(Commit targetCommit) {
+        Commit currentCommit = readObject(getHeadCommitFile(), Commit.class);
+        Map<String, String> currentBlobs = currentCommit.getBlobsID();
+        Map<String, String> targetBlobs = targetCommit.getBlobsID();
+
+        if (currentBlobs == null) currentBlobs = new HashMap<>();
+        if (targetBlobs == null) targetBlobs = new HashMap<>();
+
+        List<String> workingFiles = listWorkingFiles();
+        for (String fileName : workingFiles) {
+            boolean isTrackedCurrent = currentBlobs.containsKey(fileName);
+            boolean isInTarget = targetBlobs.containsKey(fileName);
+            if (!isTrackedCurrent && isInTarget) {
+                System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                return false;
+            }
+        }
+
+        for (String fileName : targetBlobs.keySet()) {
+            backupFile(targetCommit, fileName);
+        }
+
+        // Delete files tracked in current but not in target
+        for (String fileName : currentBlobs.keySet()) {
+            if (!targetBlobs.containsKey(fileName)) {
+                Utils.restrictedDelete(join(CWD, fileName));
+            }
+        }
+
+        return true;
     }
 }
