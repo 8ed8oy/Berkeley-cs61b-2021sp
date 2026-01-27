@@ -117,11 +117,13 @@ public class Repository {
         }
 
         Commit parentCommit = Utils.readObject(getHeadCommitFile(), Commit.class);
-        String parentID = Utils.sha1(Utils.serialize(parentCommit));
+        String currentBranch = readContentsAsString(HEAD_FILE);
+        File branchFile = join(HEADS_DIR, currentBranch);
+        String parentID = readContentsAsString(branchFile);
         Commit newCommit = new Commit(msg, parentID);
 
         /* Inherit parentcommit's blobsID */
-        HashMap<String, String> parentBlobsID = parentCommit.getBlobsID();
+        Map<String, String> parentBlobsID = parentCommit.getBlobsID();
         HashMap<String, String> newBlobsID;
         if (parentBlobsID == null) {
             newBlobsID = new HashMap<>();
@@ -239,7 +241,7 @@ public class Repository {
         Set<String> removedFiles = stagingArea.getRemovedFiles();
         /** get blobsmap from headcommit. */
         Commit headCommit = Utils.readObject(getHeadCommitFile(), Commit.class);
-        HashMap<String, String> headBlobs = headCommit.getBlobsID();
+        Map<String, String> headBlobs = headCommit.getBlobsID();
         if (headBlobs == null) {
             headBlobs = new HashMap<>();
         }
@@ -339,6 +341,116 @@ public class Repository {
         System.out.println("\n");
     }
 
+    public static void checkoutFile(String fileName){
+        checkInitialized();
+        Commit headCommit = Utils.readObject(getHeadCommitFile(), Commit.class);
+        backupFile(headCommit, fileName);
+    }
+
+    /**
+     * Find commitID globally in COMMITS_DIR.
+     * @param commitID
+     * @param fileName
+     */
+    public static void checkoutFileFromCommit(String commitID, String fileName){
+        checkInitialized();
+//        Commit headCommit = Utils.readObj ect(getHeadCommitFile(), Commit.class);
+//        while (!Utils.sha1(Utils.serialize(headCommit)).startsWith(commitID)) {
+//            String parentID = headCommit.getParent();
+//            if (parentID == null) {
+//                System.out.println("No commit with that id exists.");
+//                return;
+//            }
+//            headCommit = Utils.readObject(join(COMMITS_DIR, parentID), Commit.class);
+//        }
+        if (commitID == null || commitID.isEmpty()) {
+            System.out.println("No commit with that id exists.");
+            return;
+        }
+        List<String> commitIDs = Utils.plainFilenamesIn(COMMITS_DIR);
+
+        String findCommitID = null;
+        for (String id : commitIDs) {
+            if (id.startsWith(commitID)) {
+                findCommitID = id;
+                break;
+            }
+        }
+        if (findCommitID == null) {
+            System.out.println("No commit with that id exists.");
+            return;
+        }
+        File commitFile = join(COMMITS_DIR, findCommitID);
+        Commit findCommit = Utils.readObject(commitFile, Commit.class);
+        backupFile(findCommit, fileName);
+    }
+
+    /**
+     * Logic flow:
+     * 1. Check if repository is initialized.
+     * 2. - If the branch with the given name exists in HEADS_DIR,
+     *      print "Branch do not exist." and return.
+     *    - If it is the current branch,
+     *      print "No need to checkout the current branch." and return.
+     *    - If a working file is untracked in the current branch and would be overwritten by the checkout,
+     *      print There is an untracked file in the way; delete it, or add and commit it first.
+     * 4. Update HEAD_FILE to point to the new branch name.
+     * 5. Backup all files from the commit that the new branch points to.
+     * 6. Clear the staging area.
+     * @param branchName
+     */
+    public static void checkoutBranch(String branchName){
+        checkInitialized();
+        File branchFile = join(HEADS_DIR, branchName);
+        if (!branchFile.exists()) {
+            System.out.println("No such branch exists.");
+            return;
+        }
+        String currentBranch = readContentsAsString(HEAD_FILE);
+        if (currentBranch.equals(branchName)) {
+            System.out.println("No need to checkout the current branch.");
+            return;
+        }
+        String commitID = readContentsAsString(branchFile);
+        File commitFile = join(COMMITS_DIR, commitID);
+        Commit commit = readObject(commitFile, Commit.class);
+
+        Commit currentCommit = readObject(getHeadCommitFile(), Commit.class);
+        Map<String, String> currentBlobs = currentCommit.getBlobsID();
+        Map<String, String> targetBlobs = commit.getBlobsID();
+        if (targetBlobs == null) targetBlobs = new HashMap<>(); // Standardize null as empty
+        if (currentBlobs == null) currentBlobs = new HashMap<>();
+
+        // Check for untracked files strictly
+        List<String> workingFiles = listWorkingFiles();
+        for (String fileName : workingFiles) {
+            boolean isTrackedCurrent = currentBlobs.containsKey(fileName);
+            boolean isInTarget = targetBlobs.containsKey(fileName);
+            // If untracked in current, and present in target (would be overwritten)
+            if (!isTrackedCurrent && isInTarget) {
+                System.out.println("There is an untracked file in the way; " +
+                                   "delete it, or add and commit it first.");
+                return;
+            }
+        }
+
+        // Checkout files from target commit
+        for(String fileName : targetBlobs.keySet()){
+            backupFile(commit, fileName);
+        }
+
+        // Delete files tracked in current but not in target
+        for (String fileName : currentBlobs.keySet()) {
+            if (!targetBlobs.containsKey(fileName)) {
+                Utils.restrictedDelete(join(CWD, fileName));
+            }
+        }
+
+        writeContents(HEAD_FILE, branchName);
+        StagingArea stagingArea = StagingArea.fromFile();
+        stagingArea.clear();
+    }
+
     /*****************************************************************************************/
     /**                               Helper methods.                                        */
     /*****************************************************************************************/
@@ -355,13 +467,13 @@ public class Repository {
     /** Update the current branch to point to the new commit ID.
      * @param newCommitID
      */
-    public static void updateHead(String newCommitID) {
+    private static void updateHead(String newCommitID) {
         String currentBranch = readContentsAsString(HEAD_FILE);
         File branchFile = join(HEADS_DIR, currentBranch);
         writeContents(branchFile, newCommitID);
     }
 
-    public static void writeCommitLog(String commitID, Commit commit ){
+    private static void writeCommitLog(String commitID, Commit commit ){
         String Date = commit.getTimestamp();
         String message = commit.getMessage();
         String context = commitLogcontext(commitID, Date, message);
@@ -373,7 +485,7 @@ public class Repository {
         writeContents(GLOBAL_LOG_FILE, newLog);
     }
 
-    public static String writeMergeLog(String commitID, Commit commit, String splitID){
+    private static String writeMergeLog(String commitID, Commit commit, String splitID){
         String Date = commit.getTimestamp();
         String message = commit.getMessage();
         String context = mergeLogcontext(commitID, Date, message, splitID);
@@ -383,7 +495,7 @@ public class Repository {
         return newLog;
     }
 
-    public static String commitLogcontext(String commitID, String Date, String massage){
+    private static String commitLogcontext(String commitID, String Date, String massage){
         String context = "===\n" +
                 "commit " + commitID + "\n" +
                 "Date: " + Date + "\n"
@@ -391,7 +503,7 @@ public class Repository {
         return context;
     }
 
-    public static String mergeLogcontext(String commitID, String Date, String massage, String splitID){
+    private static String mergeLogcontext(String commitID, String Date, String massage, String splitID){
         String context = "===\n" +
                 "commit " + commitID + "\n" +
                 "Merge: " + splitID + " " + commitID + "\n" +
@@ -399,6 +511,21 @@ public class Repository {
                 + massage + "\n\n";
         return context;
     }
+
+    private static void backupFile(Commit commit, String fileName){
+        Map<String, String> headBlobs = commit.getBlobsID();
+        if (!headBlobs.containsKey(fileName)) {
+            System.out.println("File does not exist in that commit.");
+            return;
+        }
+        String blobsID = headBlobs.get(fileName);
+        File blobFile = join(BLOBS_DIR, blobsID);
+        byte[] content = readContents(blobFile);
+        File fileToCheckout = join(CWD, fileName);
+        writeContents(fileToCheckout, content);
+    }
+
+/*********************************************************************************************/
 
     /** List all files in the working directory recursively, excluding .gitlet directory.
      * @return List of file paths relative to the working directory.

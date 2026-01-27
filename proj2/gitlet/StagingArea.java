@@ -49,8 +49,8 @@ public class StagingArea implements Serializable {
         // Logic: If the file is the same as the current commit, unstage it.
         File commitFile = Repository.getHeadCommitFile();
         Commit headCommit = readObject(commitFile, Commit.class);
-        HashMap<String, String> headBlobs = headCommit.getBlobsID();
-        if (headBlobs.containsKey(fileName) && headBlobs.get(fileName).equals(blobsID)) {
+        Map<String, String> headBlobs = headCommit.getBlobsID();
+        if (headBlobs != null && headBlobs.containsKey(fileName) && headBlobs.get(fileName).equals(blobsID)) {
             addedFiles.remove(fileName);
             return;
         }

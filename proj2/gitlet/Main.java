@@ -54,7 +54,18 @@ public class Main {
                 Repository.status();
                 break;
             case "checkout":
-
+                if (args.length ==3 && "--".equals(args[1])) {
+                    // checkout -- [file name]
+                    Repository.checkoutFile(args[2]);
+                } else if (args.length ==4 && "--".equals(args[2])) {
+                    // checkout [commit id] -- [file name]
+                    Repository.checkoutFileFromCommit(args[1], args[3]);
+                } else if (args.length ==2) {
+                    // checkout [branch name]
+                    Repository.checkoutBranch(args[1]);
+                } else {
+                    System.out.println("Incorrect operands.");
+                }
                 break;
             case "branch":
 

@@ -8,6 +8,7 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
+import java.util.TreeMap;
 
 import static gitlet.Utils.serialize;
 
@@ -22,7 +23,7 @@ public class Commit implements Serializable {
     private String timestamp;
     private String parent;
     private String secondParent; // used in merge commits
-    private HashMap<String, String> blobsID = new HashMap<>();
+    private TreeMap<String, String> blobsID = new TreeMap<>();
 
     public Commit (String massage, String parent) {
         this.message = massage;
@@ -45,7 +46,7 @@ public class Commit implements Serializable {
         Utils.writeObject(commitFile, this);
     }
 
-    public HashMap<String, String> getBlobsID() {
+    public TreeMap<String, String> getBlobsID() {
         return this.blobsID;
     }
 
@@ -57,11 +58,11 @@ public class Commit implements Serializable {
         return this.timestamp;
     }
 
-    public void setBlobsID(HashMap<String, String> blobsID) {
+    public void setBlobsID(Map<String, String> blobsID) {
         if (blobsID == null) {
             throw new IllegalArgumentException("blobsID cannot be null");
         }
-        this.blobsID = blobsID;
+        this.blobsID = new TreeMap<>(blobsID);
     }
 
     public String getParent() {return this.parent;}
