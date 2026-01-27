@@ -24,6 +24,8 @@ public class Repository {
     public static final File HEADS_DIR = join(GITLET_DIR, "heads");
     public static final File HEAD_FILE = join(GITLET_DIR, "HEAD");
     public static final File INDEX_FILE = join(GITLET_DIR, "index");
+    public static final File GLOBAL_LOG_FILE = join(GITLET_DIR, "global_log");
+
 
     public static void checkInitialized() {
         if (!GITLET_DIR.exists()) {
@@ -54,6 +56,9 @@ public class Repository {
         File masterBranch = join(HEADS_DIR, "master");
         writeContents(masterBranch, commitID);
 
+        /* write initial log */
+        writeCommitLog(commitID, initialCommit);
+
         /* set HEAD to master */
         writeContents(HEAD_FILE, "master");
     }
@@ -78,14 +83,7 @@ public class Repository {
         StagingArea stagingArea = StagingArea.fromFile();
         stagingArea.add(fileName);
     }
-    /** @return File object of the head commit.
-     */
-    public static File getHeadCommitFile() {
-        String currentBranch = readContentsAsString(HEAD_FILE);
-        File branchFile = join(HEADS_DIR, currentBranch);
-        String headCommitID = readContentsAsString(branchFile);
-        return join(COMMITS_DIR, headCommitID);
-    }
+
     /** Logic flow:
      * 1. Check if repository is initialized.
      * 2. Check if the commit message is not null.
@@ -95,6 +93,12 @@ public class Repository {
      * 6. Apply staging area changes to new commit's blobsID
      * 7. Point the current branch to the new commit.
      * 8. Clear the staging area.
+     * 9. Write log:
+     * ===
+     * commit a0da1ea5a15ab613bf9961fd86f010cf74c7ee48
+     * Date: Thu Nov 9 20:00:05 2017 -0800
+     * A commit message.
+     *
      * @param msg
      */
     public static void commit(String msg){
@@ -135,6 +139,8 @@ public class Repository {
         updateHead(newCommitID);
 
         stagingArea.clear();
+
+        writeCommitLog(newCommitID, newCommit);
     }
 
     /** Logic flow:
@@ -172,6 +178,43 @@ public class Repository {
         stagingArea.save();
     }
 
+    public static void log(){
+        checkInitialized();
+        File currentCommitFile = getHeadCommitFile();
+        while (currentCommitFile != null) {
+            Commit currentCommit = readObject(currentCommitFile, Commit.class);
+            String commitID = sha1(serialize(currentCommit));
+            String Date = currentCommit.getTimestamp();
+            String message = currentCommit.getMessage();
+            String context = commitLogcontext(commitID, Date, message);
+            System.out.print(context);
+            String parentID = currentCommit.getParent();
+            if (parentID == null) {
+                break;
+            }
+            currentCommitFile = join(COMMITS_DIR, parentID);
+        }
+    }
+
+    public static void globalLog(){
+        checkInitialized();
+        String globalLog = readContentsAsString(GLOBAL_LOG_FILE);
+        System.out.print(globalLog);
+    }
+
+    /*****************************************************************************************/
+    /**                               Helper methods.                                        */
+    /*****************************************************************************************/
+
+    /** @return File object of the head commit.
+     */
+    public static File getHeadCommitFile() {
+        String currentBranch = readContentsAsString(HEAD_FILE);
+        File branchFile = join(HEADS_DIR, currentBranch);
+        String headCommitID = readContentsAsString(branchFile);
+        return join(COMMITS_DIR, headCommitID);
+    }
+
     /** Update the current branch to point to the new commit ID.
      * @param newCommitID
      */
@@ -181,4 +224,42 @@ public class Repository {
         writeContents(branchFile, newCommitID);
     }
 
+    public static void writeCommitLog(String commitID, Commit commit ){
+        String Date = commit.getTimestamp();
+        String message = commit.getMessage();
+        String context = commitLogcontext(commitID, Date, message);
+        String previousLog = "";
+        if (GLOBAL_LOG_FILE.exists()) {
+            previousLog = readContentsAsString(GLOBAL_LOG_FILE);
+        }
+        String newLog = context + previousLog;
+        writeContents(GLOBAL_LOG_FILE, newLog);
+    }
+
+    public static String writeMergeLog(String commitID, Commit commit, String splitID){
+        String Date = commit.getTimestamp();
+        String message = commit.getMessage();
+        String context = mergeLogcontext(commitID, Date, message, splitID);
+        String previousLog = readContentsAsString(GLOBAL_LOG_FILE);
+        String newLog = context + previousLog;
+        writeContents(GLOBAL_LOG_FILE, newLog);
+        return newLog;
+    }
+
+    public static String commitLogcontext(String commitID, String Date, String massage){
+        String context = "===\n" +
+                "commit " + commitID + "\n" +
+                "Date: " + Date + "\n"
+                + massage + "\n\n";
+        return context;
+    }
+
+    public static String mergeLogcontext(String commitID, String Date, String massage, String splitID){
+        String context = "===\n" +
+                "commit " + commitID + "\n" +
+                "Merge: " + splitID + " " + commitID + "\n" +
+                "Date: " + Date + "\n"
+                + massage + "\n\n";
+        return context;
+    }
 }

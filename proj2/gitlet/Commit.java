@@ -2,8 +2,11 @@ package gitlet;
 
 import java.io.File;
 import java.io.Serializable;
+import java.text.DateFormat;
+import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.HashMap;
+import java.util.Locale;
 import java.util.Map;
 
 import static gitlet.Utils.serialize;
@@ -18,16 +21,22 @@ public class Commit implements Serializable {
     private String message;
     private String timestamp;
     private String parent;
+    private String secondParent; // used in merge commits
     private HashMap<String, String> blobsID = new HashMap<>();
 
     public Commit (String massage, String parent) {
         this.message = massage;
         if (parent == null) {
-            this.timestamp = "00:00:00 UTC, Thursday, 1 January 1970";
+            this.timestamp = dateToTimeStamp(new Date(0));
         } else {
-            this.timestamp = new Date().toString();
+            this.timestamp = dateToTimeStamp(new Date());
         }
         this.parent = parent;
+    }
+
+    private String dateToTimeStamp(Date date) {
+        DateFormat dateFormat = new SimpleDateFormat("EEE MMM d HH:mm:ss yyyy Z", Locale.CHINA);
+        return dateFormat.format(date);
     }
 
     public void save(){
@@ -48,11 +57,11 @@ public class Commit implements Serializable {
         return this.timestamp;
     }
 
-    public String getParent() {
-        return this.parent;
-    }
-
     public void setBlobsID(HashMap<String, String> blobsID) {
         this.blobsID = blobsID;
     }
+
+    public String getParent() {return this.parent;}
+
+    public  String getSecondParent() {return this.secondParent;}
 }
