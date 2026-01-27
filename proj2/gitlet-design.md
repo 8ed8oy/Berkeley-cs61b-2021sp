@@ -11,10 +11,12 @@
 
 
 ### commit
-- Massage : contains the commit message
-- Time : contains the time a commit was made
-- Parent : the parent commit of a commit object
-- Blob : a mapping of file names to blob ids
+- 'Massage' : contains the commit message
+- 'Time' : contains the time a commit was made
+- 'Parent' : the parent commit of a commit object
+- 'BlobsID' : a mapping of file names to blob ids
+  - 'BlobsID' use TreeMap to keep the order of file names consistent,
+  - which helps in generating consistent commit hashes.
 
 #### Fields
 - `Save` () : Serializes and saves the commit object to disk.

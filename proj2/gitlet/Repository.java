@@ -451,6 +451,22 @@ public class Repository {
         stagingArea.clear();
     }
 
+    public static void branch(String branchName){
+        checkInitialized();
+        if (branchName == null || branchName.isEmpty()) {
+            System.out.println("Branch name cannot be empty.");
+            return;
+        }
+        File branchFile = join(HEADS_DIR, branchName);
+        if (branchFile.exists()) {
+            System.out.println("A branch with that name already exists.");
+            return;
+        }
+        File headCommitFile = getHeadCommitFile();
+        String headCommitID = readContentsAsString(headCommitFile);
+        writeContents(branchFile, headCommitID);
+    }
+
     /*****************************************************************************************/
     /**                               Helper methods.                                        */
     /*****************************************************************************************/

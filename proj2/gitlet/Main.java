@@ -68,7 +68,8 @@ public class Main {
                 }
                 break;
             case "branch":
-
+                validateNumArgs("branch", args, 2);
+                Repository.branch(args[1]);
                 break;
             case "rm-branch":
 
