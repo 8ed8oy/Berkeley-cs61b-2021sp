@@ -58,6 +58,9 @@ public class Commit implements Serializable {
     }
 
     public void setBlobsID(HashMap<String, String> blobsID) {
+        if (blobsID == null) {
+            throw new IllegalArgumentException("blobsID cannot be null");
+        }
         this.blobsID = blobsID;
     }
 

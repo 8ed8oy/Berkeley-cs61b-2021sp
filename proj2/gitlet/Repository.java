@@ -3,7 +3,13 @@ package gitlet;
 import java.io.File;
 import static gitlet.Utils.*;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.Set;
+import java.util.TreeMap;
 
 
 /** Represents a gitlet repository.
@@ -196,10 +202,141 @@ public class Repository {
         }
     }
 
+    /** Global log is stored in GLOBAL_LOG_FILE, which is different from the doc. */
     public static void globalLog(){
         checkInitialized();
         String globalLog = readContentsAsString(GLOBAL_LOG_FILE);
         System.out.print(globalLog);
+    }
+
+    public static void find(String message){
+        checkInitialized();
+        List<String> commitIDs = Utils.plainFilenamesIn(COMMITS_DIR);
+        for(String commitID : commitIDs){
+            File commitFile = join(COMMITS_DIR, commitID);
+            Commit commit = readObject(commitFile, Commit.class);
+            if(commit.getMessage().equals(message)){
+                System.out.println(commitID);
+            }
+        }
+    }
+
+    /**
+     * 1. Check if repository is initialized.
+     * 2. Print out the status of
+     * branches, * current branch marked with a *,
+     * staged files,
+     * removed files,
+     * modifications not staged for commit,
+     * untracked files.
+     */
+    public static void status(){
+        checkInitialized();
+        StagingArea stagingArea = StagingArea.fromFile();
+        List<String> allFiles = listWorkingFiles();
+        Set<String> allFilesSet = new HashSet<>(allFiles);
+        Map<String, String> addedFiles = stagingArea.getAddedFiles();
+        Set<String> removedFiles = stagingArea.getRemovedFiles();
+        /** get blobsmap from headcommit. */
+        Commit headCommit = Utils.readObject(getHeadCommitFile(), Commit.class);
+        HashMap<String, String> headBlobs = headCommit.getBlobsID();
+        if (headBlobs == null) {
+            headBlobs = new HashMap<>();
+        }
+
+        Map<String, String> workingBlobs = new HashMap<>();
+        for (String fileName : allFiles) {
+            File file = join(CWD, fileName);
+            byte[] content = readContents(file);
+            workingBlobs.put(fileName, Utils.sha1((Object) content));
+        }
+
+        String currentBranch = readContentsAsString(HEAD_FILE);
+        List<String> branchNames = Utils.plainFilenamesIn(HEADS_DIR);
+        Collections.sort(branchNames);
+
+        System.out.println("=== Branches ===");
+        for (String branchName : branchNames) {
+            if (branchName.equals(currentBranch)) {
+                System.out.println("*" + branchName);
+            } else {
+                System.out.println(branchName);
+            }
+        }
+        System.out.println("\n");
+
+        System.out.println("=== Staged Files ===");
+        List<String> stagedList = new ArrayList<>(addedFiles.keySet());
+        Collections.sort(stagedList);
+        for (String fileName : stagedList) {
+            System.out.println(fileName);
+        }
+        System.out.println("\n");
+
+        System.out.println("=== Removed Files ===");
+        List<String> removedList = new ArrayList<>(removedFiles);
+        Collections.sort(removedList);
+        for (String fileName : removedList) {
+            System.out.println(fileName);
+        }
+        System.out.println("\n");
+
+        /**
+         * case:
+         * 1. Tracked in the current commit, changed in the working directory, but not staged.
+         * 2. Staged for addition, but with different contents than in the working directory
+         * 3. Staged for addition, but deleted in the working directory
+         * 4. Not staged for removal, but tracked in the current commit
+         *          and deleted from the working directory.
+         */
+        System.out.println("=== Modifications Not Staged For Commit ===");
+        Map<String, String> modifications = new TreeMap<>();
+        /** case 1. */
+        for (String fileName : allFilesSet) {
+            if (!addedFiles.containsKey(fileName) && headBlobs.containsKey(fileName)) {
+                String blobsID = workingBlobs.get(fileName);
+                if (blobsID != null && !headBlobs.get(fileName).equals(blobsID)) {
+                    modifications.put(fileName, "modified");
+                }
+            }
+        }
+        /** case 2 and 3. */
+        for (String addedFile: addedFiles.keySet()){
+            if (allFilesSet.contains(addedFile)) {
+                String blobsID = workingBlobs.get(addedFile);
+                if (blobsID != null && !addedFiles.get(addedFile).equals(blobsID)) {
+                    modifications.put(addedFile, "modified");
+                }
+            } else {
+                modifications.put(addedFile, "deleted");
+            }
+        }
+        /** case 4. */
+        for (String fileName : headBlobs.keySet()){
+            if (!allFilesSet.contains(fileName)
+                    && !removedFiles.contains(fileName)){
+                modifications.put(fileName, "deleted");
+            }
+        }
+        for (Map.Entry<String, String> entry : modifications.entrySet()) {
+            System.out.println(entry.getKey() + " (" + entry.getValue() + ")");
+        }
+        System.out.println("\n");
+
+        System.out.println("=== Untracked Files ===");
+        List<String> untracked = new ArrayList<>();
+        for (String fileName : allFilesSet) {
+            if(!addedFiles.containsKey(fileName)
+                    && !headBlobs.containsKey(fileName)
+                    && !removedFiles.contains(fileName)){
+                untracked.add(fileName);
+            }
+        }
+        Collections.sort(untracked);
+        for (String fileName : untracked) {
+            System.out.println(fileName);
+        }
+        System.out.println("\n");
     }
 
     /*****************************************************************************************/
@@ -261,5 +398,35 @@ public class Repository {
                 "Date: " + Date + "\n"
                 + massage + "\n\n";
         return context;
+    }
+
+    /** List all files in the working directory recursively, excluding .gitlet directory.
+     * @return List of file paths relative to the working directory.
+     * @Author ChatGPT
+     */
+    private static List<String> listWorkingFiles() {
+        List<String> files = new ArrayList<>();
+        collectWorkingFiles(CWD, "", files);
+        return files;
+    }
+
+    private static void collectWorkingFiles(File dir, String prefix, List<String> out) {
+        File[] entries = dir.listFiles();
+        if (entries == null) {
+            return;
+        }
+        for (File entry : entries) {
+            if (entry.getName().equals(".gitlet")) {
+                continue;
+            }
+            String relPath = prefix.isEmpty()
+                    ? entry.getName()
+                    : prefix + File.separator + entry.getName();
+            if (entry.isDirectory()) {
+                collectWorkingFiles(entry, relPath, out);
+            } else {
+                out.add(relPath);
+            }
+        }
     }
 }

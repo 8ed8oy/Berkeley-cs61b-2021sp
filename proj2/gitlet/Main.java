@@ -47,10 +47,11 @@ public class Main {
                 Repository.globalLog();
                 break;
             case "find":
-
+                validateNumArgs("find", args, 2);
+                Repository.find(args[1]);
                 break;
             case "status":
-
+                Repository.status();
                 break;
             case "checkout":
 
