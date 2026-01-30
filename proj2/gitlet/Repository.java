@@ -393,9 +393,7 @@ public class Repository {
             System.out.println("No need to checkout the current branch.");
             return;
         }
-        String commitID = readContentsAsString(branchFile);
-        File commitFile = join(COMMITS_DIR, commitID);
-        Commit commit = readObject(commitFile, Commit.class);
+        Commit commit = getCommit(branchName);
 
         if (!checkoutTree(commit)) {
             return;
@@ -464,6 +462,183 @@ public class Repository {
 
         StagingArea stagingArea = StagingArea.fromFile();
         stagingArea.clear();
+    }
+
+    /**
+     * Logic flow:
+     * 1. Check if repository is initialized and check input.
+     * 2. If the branch with the given name does not exist in HEADS_DIR,
+     *      print "A branch with that name does not exist." and return.
+     * 3. If given branch is ancestor(merge a file before me or the file is same),
+     *      print "Given branch is an ancestor of the current branch." and return.
+     * 4. If the branch is "Fast-forward" (current branch is ancestor of given branch),
+     *      'checkoutBranch(branchName)' and print "Current branch fast-forwarded." and return.
+     * 5. Else, this is a true merge.
+     * @param targetBranch
+     */
+    public static void merge(String targetBranch){
+        checkInitialized();
+        if (targetBranch == null || targetBranch.isEmpty()) {
+            System.out.println("A branch name is required.");
+            return;
+        }
+        File targetBranchFile = join(HEADS_DIR, targetBranch);;
+        if (!targetBranchFile.exists()) {
+            System.out.println("A branch with that name does not exist.");
+            return;
+        }
+
+        String currentBranch = readContentsAsString(HEAD_FILE);
+        if (targetBranch.equals(readContentsAsString(HEAD_FILE))) {
+            System.out.println("Cannot merge a branch with itself.");
+            return;
+        }
+
+        StagingArea stagingArea = StagingArea.fromFile();
+        if (!stagingArea.isEmpty()) {
+            System.out.println("You have uncommitted changes.");
+            return;
+        }
+
+        File currentHeadFile = getHeadCommitFile();
+        Commit currentCommit = readObject(currentHeadFile, Commit.class);
+        String currentCommitID = sha1(serialize(currentCommit));
+
+        Commit targetCommit = getCommit(targetBranch);
+        String targetCommitID = sha1(serialize(targetCommit));
+
+        Commit splitPointCommit = findSplitPoint(currentCommit, targetCommit);
+        if (splitPointCommit == null) {
+            System.out.println("Gitlet goes wrong.");
+            return;
+        }
+        String splitCommitID = sha1(serialize(splitPointCommit));
+
+        if (splitCommitID.equals(targetCommitID)) {
+            System.out.println("Given branch is an ancestor of the current branch.");
+            return;
+        }
+        if (splitCommitID.equals(currentCommitID)) {
+            checkoutBranch(targetBranch);
+            System.out.println("Current branch fast-forwarded.");
+            return;
+        }
+
+        /** True merge logic flow:
+         * s:file in splitPointCommit
+         * c:file in currentCommit
+         * t:file in targetCommit
+         * 0:file not in commit
+         *
+         * 1. c==s && t!=s && t!=0: checkout t, add t
+         * 2. c!=s && t==s: do nothing
+         * 3. c==t: do nothing
+         *  - If a file was removed from both the current and given branch,
+         *    but a file of the same name is present in the working directory,
+         *    it is left alone and continues to be not tracked nor staged in the merge.
+         * 4. s == 0 == t && c != 0: do nothing
+         * 5. s == 0 && c == 0 && t != 0: checkout t, add t
+         * 6. s != 0 && c == s && t == 0: rm c
+         * 7. s != 0 && c == 0 && t == s: do nothing
+         * 8.conflict cases
+         */
+        boolean encounterMergeConflict = false;
+        Map<String, String> splitBlobs = splitPointCommit.getBlobsID();
+        Map<String, String> currentBlobs = currentCommit.getBlobsID();
+        Map<String, String> targetBlobs = targetCommit.getBlobsID();
+        Set<String> allFilesSet = new HashSet<>();
+        allFilesSet.addAll(splitBlobs.keySet());
+        allFilesSet.addAll(currentBlobs.keySet());
+        allFilesSet.addAll(targetBlobs.keySet());
+
+        for (String fileName : allFilesSet) {
+            String s = splitBlobs.get(fileName);
+            String c = currentBlobs.get(fileName);
+            String t = targetBlobs.get(fileName);
+
+            if (c != null && c.equals(s) && t != null && !t.equals(s)) {
+                // case 1
+                backupFile(targetCommit, fileName);
+                add(fileName);
+            } else if (c != null && !c.equals(s) && t.equals(s)) {
+                // case 2 do nothing
+            } else if (c != null && c.equals(t)) {
+                // case 3 do nothing
+            } else if (s == null && t == null && c != null) {
+                // case 4 do nothing
+            } else if (s == null && c == null && t != null) {
+                // case 5
+                backupFile(targetCommit, fileName);
+                add(fileName);
+            } else if (s != null && c != null && c.equals(s) && t == null) {
+                // case 6
+                rm(fileName);
+            } else if (s != null && c == null && t != null && t.equals(s)) {
+                // case 7
+            }
+            /** case 8 conflict
+             *   - s != 0 && c != s && t != s && c != t
+             *   - s != 0 && (c != s && t == 0) or (t != s && c == 0)
+             *   - s == 0 && c != 0 && t != 0 && c != t
+             *
+             * conflict format:
+             * <<<<<<< HEAD
+             * (contents of file in current branch)
+             * =======
+             * (contents of file in target branch)
+             * >>>>>>>
+             */
+
+            else if (isConflict(s, c, t)) {
+                encounterMergeConflict = true;
+
+                String conflictContent = "";
+                conflictContent += "<<<<<<< HEAD\n";
+                if (c != null) {
+                    File cBlobFile = join(BLOBS_DIR, c);
+                    byte[] cContent = readContents(cBlobFile);
+                    conflictContent += new String(cContent);
+                }
+                conflictContent += "=======\n";
+                if (t != null) {
+                    File tBlobFile = join(BLOBS_DIR, t);
+                    byte[] tContent = readContents(tBlobFile);
+                    conflictContent += new String(tContent);
+                }
+                conflictContent += ">>>>>>>\n";
+
+                File fileToWrite = join(CWD, fileName);
+                writeContents(fileToWrite, conflictContent);
+                add(fileName);
+            }
+
+        }
+
+        stagingArea = StagingArea.fromFile();
+
+        Commit mergeCommit = new Commit(
+                "Merged " + targetBranch + " into " + currentBranch + ".",
+                currentCommitID,
+                targetCommitID
+        );
+
+        Map<String, String> merged = new HashMap<>(currentBlobs);
+        merged.putAll(stagingArea.getAddedFiles());
+        for (String rmName : stagingArea.getRemovedFiles()) {
+            merged.remove(rmName);
+        }
+        mergeCommit.setBlobsID(merged);
+        mergeCommit.save();
+
+        String mergeCommitID = sha1(serialize(mergeCommit));
+        updateHead(mergeCommitID);
+        stagingArea.clear();
+
+        writeMergeLogFixed(mergeCommitID, mergeCommit, currentCommitID, targetCommitID);
+
+        if (encounterMergeConflict) {
+            System.out.println("Encountered a merge conflict.");
+        }
     }
 
     /*****************************************************************************************/
@@ -540,6 +715,105 @@ public class Repository {
         writeContents(fileToCheckout, content);
     }
 
+    private static Commit getCommit(String branchName) {
+        File branchFile = join(HEADS_DIR, branchName);
+        String commitID = readContentsAsString(branchFile);
+        File commitFile = join(COMMITS_DIR, commitID);
+        Commit commit = readObject(commitFile, Commit.class);
+        return commit;
+    }
+
+    /** Checkout all files in the target commit to the working directory.
+     * @param targetCommit
+     * @return true if checkout is successful, false if there are untracked files in the way.
+     */
+    private static boolean checkoutTree(Commit targetCommit) {
+        Commit currentCommit = readObject(getHeadCommitFile(), Commit.class);
+        Map<String, String> currentBlobs = currentCommit.getBlobsID();
+        Map<String, String> targetBlobs = targetCommit.getBlobsID();
+
+        if (currentBlobs == null) currentBlobs = new HashMap<>();
+        if (targetBlobs == null) targetBlobs = new HashMap<>();
+
+        List<String> workingFiles = listWorkingFiles();
+        for (String fileName : workingFiles) {
+            boolean isTrackedCurrent = currentBlobs.containsKey(fileName);
+            boolean isInTarget = targetBlobs.containsKey(fileName);
+            if (!isTrackedCurrent && isInTarget) {
+                System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
+                return false;
+            }
+        }
+
+
+        for (String fileName : targetBlobs.keySet()) {
+            backupFile(targetCommit, fileName);
+        }
+
+        // Delete files tracked in current but not in target
+        for (String fileName : currentBlobs.keySet()) {
+            if (!targetBlobs.containsKey(fileName)) {
+                Utils.restrictedDelete(join(CWD, fileName));
+            }
+        }
+
+        return true;
+    }
+
+    private static Commit findSplitPoint(Commit commit1, Commit commit2) {
+        Set<String> visited = new HashSet<>();
+        while (true) {
+            String commit1ID = Utils.sha1(Utils.serialize(commit1));
+            visited.add(commit1ID);
+            String parentID = commit1.getParent();
+            if (parentID == null) {
+                break;
+            }
+            File parentFile = join(COMMITS_DIR, parentID);
+            commit1 = Utils.readObject(parentFile, Commit.class);
+        }
+        while (true) {
+            String commit2ID = Utils.sha1(Utils.serialize(commit2));
+            if (visited.contains(commit2ID)) {
+                return commit2;
+            }
+            String parentID = commit2.getParent();
+            if (parentID == null) {
+                break;
+            }
+            File parentFile = join(COMMITS_DIR, parentID);
+            commit2 = Utils.readObject(parentFile, Commit.class);
+        }
+        return null;
+    }
+
+    private static boolean isConflict(String s, String c, String t) {
+        if (s == null) {
+            return c != null && t != null && !c.equals(t);
+        }
+        if (c == null && t == null) return false;
+        if (c == null) return t != null && !t.equals(s);
+        if (t == null) return !c.equals(s);
+        boolean cChanged = !c.equals(s);
+        boolean tChanged = !t.equals(s);
+        return cChanged && tChanged && !c.equals(t);
+    }
+
+    private static void writeMergeLogFixed(String commitID, Commit commit, String parent1, String parent2) {
+        String date = commit.getTimestamp();
+        String msg = commit.getMessage();
+        String p1 = parent1;
+        String p2 = parent2;
+        String context = "===\n"
+                + "commit " + commitID + "\n"
+                + "Merge: " + p1 + " " + p2 + "\n"
+                + "Date: " + date + "\n"
+                + msg + "\n\n";
+        String prev =readContentsAsString(GLOBAL_LOG_FILE);
+        writeContents(GLOBAL_LOG_FILE, context + prev);
+    }
+
+
 /*********************************************************************************************/
 
     /** List all files in the working directory recursively, excluding .gitlet directory.
@@ -585,41 +859,5 @@ public class Repository {
             return null;
         }
         return findCommitID;
-    }
-
-    /** Checkout all files in the target commit to the working directory.
-     * @param targetCommit
-     * @return true if checkout is successful, false if there are untracked files in the way.
-     */
-    private static boolean checkoutTree(Commit targetCommit) {
-        Commit currentCommit = readObject(getHeadCommitFile(), Commit.class);
-        Map<String, String> currentBlobs = currentCommit.getBlobsID();
-        Map<String, String> targetBlobs = targetCommit.getBlobsID();
-
-        if (currentBlobs == null) currentBlobs = new HashMap<>();
-        if (targetBlobs == null) targetBlobs = new HashMap<>();
-
-        List<String> workingFiles = listWorkingFiles();
-        for (String fileName : workingFiles) {
-            boolean isTrackedCurrent = currentBlobs.containsKey(fileName);
-            boolean isInTarget = targetBlobs.containsKey(fileName);
-            if (!isTrackedCurrent && isInTarget) {
-                System.out.println("There is an untracked file in the way; delete it, or add and commit it first.");
-                return false;
-            }
-        }
-
-        for (String fileName : targetBlobs.keySet()) {
-            backupFile(targetCommit, fileName);
-        }
-
-        // Delete files tracked in current but not in target
-        for (String fileName : currentBlobs.keySet()) {
-            if (!targetBlobs.containsKey(fileName)) {
-                Utils.restrictedDelete(join(CWD, fileName));
-            }
-        }
-
-        return true;
     }
 }

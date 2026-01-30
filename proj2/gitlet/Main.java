@@ -80,7 +80,8 @@ public class Main {
                 Repository.reSet(args[1]);
                 break;
             case "merge":
-
+                validateNumArgs("merge", args, 2);
+                Repository.merge(args[1]);
                 break;
             default:
                 System.out.println("Command does not exist.");

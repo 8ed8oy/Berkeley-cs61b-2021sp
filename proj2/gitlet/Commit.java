@@ -33,6 +33,19 @@ public class Commit implements Serializable {
             this.timestamp = dateToTimeStamp(new Date());
         }
         this.parent = parent;
+        this.blobsID = new TreeMap<>();
+    }
+
+    public Commit (String massage, String parent, String secondParent) {
+        this.message = massage;
+        if (parent == null) {
+            this.timestamp = dateToTimeStamp(new Date(0));
+        } else {
+            this.timestamp = dateToTimeStamp(new Date());
+        }
+        this.parent = parent;
+        this.secondParent = secondParent;
+        this.blobsID = new TreeMap<>();
     }
 
     private String dateToTimeStamp(Date date) {
@@ -63,6 +76,7 @@ public class Commit implements Serializable {
             throw new IllegalArgumentException("blobsID cannot be null");
         }
         this.blobsID = new TreeMap<>(blobsID);
+        this.save();
     }
 
     public String getParent() {return this.parent;}
