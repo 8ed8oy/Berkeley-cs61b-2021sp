@@ -9,7 +9,7 @@ import byow.TileEngine.Tileset;
  */
 public class BoringWorldDemo {
 
-    private static final int WIDTH = 60;
+    private static final int WIDTH = 60; //16 pixel per tile
     private static final int HEIGHT = 30;
 
     public static void main(String[] args) {
