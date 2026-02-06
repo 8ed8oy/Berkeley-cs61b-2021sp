@@ -15,8 +15,28 @@ public class RectangularRoom implements Room {
         this.height = height;
     }
 
+    public int getX() {
+        return x;
+    }
+
+    public int getY() {
+        return y;
+    }
+
+    public int getWidth() {
+        return width;
+    }
+
+    public int getHeight() {
+        return height;
+    }
+
     public Position getCenter() {
         return new Position(x + width / 2, y + height / 2);
+    }
+
+    public boolean contains(Position p) {
+        return p.x >= x && p.x < x + width && p.y >= y && p.y < y + height;
     }
 
     public void draw(TETile[][] world, TETile floorTile) {

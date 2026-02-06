@@ -7,12 +7,20 @@ import edu.princeton.cs.introcs.StdDraw;
 
 import java.awt.Color;
 import java.awt.Font;
+import java.util.ArrayList;
+import java.util.List;
 
 public class Engine {
     TERenderer ter = new TERenderer();
     /* Feel free to change the width and height. */
-    public static final int WIDTH = 80;
-    public static final int HEIGHT = 50;
+    public static final int WIDTH = 120;
+    public static final int HEIGHT = 60;
+
+    private static final int TILE_SIZE = 16;
+
+    private Player player;
+    private int level;
+    private long currentSeed;
 
     /**
      * Method used for exploring a fresh world. This method should handle all inputs,
@@ -28,7 +36,10 @@ public class Engine {
                 char c = Character.toUpperCase(StdDraw.nextKeyTyped());
                 if (c == 'N') {
                     long seed = handleSeedInput();
-                    startGame(seed);
+                    this.currentSeed = seed;
+                    this.level = 1;
+                    this.player = null; // New player
+                    gameLoop();
                     break;
                 } else if (c == 'Q') {
                     System.exit(0);
@@ -43,13 +54,13 @@ public class Engine {
         StdDraw.setPenColor(Color.WHITE);
         Font font = new Font("Monaco", Font.BOLD, 30);
         StdDraw.setFont(font);
-        StdDraw.text(WIDTH / 2, HEIGHT * 0.75, "CS61B: THE GAME");
+        StdDraw.text(WIDTH / 2.0, HEIGHT * 0.75, "CS61B: THE GAME");
 
         Font smallFont = new Font("Monaco", Font.PLAIN, 20);
         StdDraw.setFont(smallFont);
-        StdDraw.text(WIDTH / 2, HEIGHT * 0.5, "New Game (N)");
-        StdDraw.text(WIDTH / 2, HEIGHT * 0.45, "Load Game (L)");
-        StdDraw.text(WIDTH / 2, HEIGHT * 0.4, "Quit (Q)");
+        StdDraw.text(WIDTH / 2.0, HEIGHT * 0.5, "New Game (N)");
+        StdDraw.text(WIDTH / 2.0, HEIGHT * 0.45, "Load Game (L)");
+        StdDraw.text(WIDTH / 2.0, HEIGHT * 0.4, "Quit (Q)");
         StdDraw.show();
     }
 
@@ -67,6 +78,7 @@ public class Engine {
                     drawSeedFrame(input);
                 }
             }
+            StdDraw.pause(10);
         }
         try {
             return Long.parseLong(input);
@@ -80,69 +92,298 @@ public class Engine {
         StdDraw.setPenColor(Color.WHITE);
         Font font = new Font("Monaco", Font.BOLD, 30);
         StdDraw.setFont(font);
-        StdDraw.text(WIDTH / 2, HEIGHT * 0.6, "Enter Seed (Press S to start):");
-        StdDraw.text(WIDTH / 2, HEIGHT * 0.5, s);
+        StdDraw.text(WIDTH / 2.0, HEIGHT * 0.6, "Enter Seed (Press S to start):");
+        StdDraw.text(WIDTH / 2.0, HEIGHT * 0.5, s);
         StdDraw.show();
     }
 
-    private void startGame(long seed) {
-        WorldGenerator generator = new WorldGenerator(seed, WIDTH, HEIGHT);
-        TETile[][] world = generator.generate();
+    private void gameLoop() {
+        while (true) {
+            boolean nextLevel = runLevel();
+            if (nextLevel) {
+                level++;
+                currentSeed++; // Simple seed increment for next level
+            } else {
+                // Game Over or unexpected exit
+                break;
+            }
+        }
+    }
 
-        // Find a valid starting position
-        Position playerPos = new Position(WIDTH / 2, HEIGHT / 2);
+    private boolean runLevel() {
+        WorldGenerator generator = new WorldGenerator(currentSeed, WIDTH, HEIGHT);
+        TETile[][] staticWorld = generator.generate();
+        List<RectangularRoom> rooms = generator.getRooms();
+
+        List<Monster> monsters = new ArrayList<>();
+        List<Trap> traps = new ArrayList<>();
+        Position startPos = null;
+        Position exitPos = null;
+
+        // Scan world for entities and features
         for (int x = 0; x < WIDTH; x++) {
             for (int y = 0; y < HEIGHT; y++) {
-                if (world[x][y].equals(Tileset.FLOOR)) {
-                    playerPos = new Position(x, y);
-                    break;
+                if (staticWorld[x][y].equals(Tileset.MOUNTAIN)) {
+                    monsters.add(new Monster(new Position(x, y)));
+                    staticWorld[x][y] = Tileset.FLOOR; // Replace with floor
+                } else if (staticWorld[x][y].equals(Tileset.UNLOCKED_DOOR)) {
+                    startPos = new Position(x, y);
+                    // Keep door visuals? Or replace?
+                    // Let's keep it as "Entrance"
+                } else if (staticWorld[x][y].equals(Tileset.LOCKED_DOOR)) {
+                    exitPos = new Position(x, y);
                 }
             }
         }
 
-        // Game Loop
-        while (true) {
+        if (player == null) {
+            player = new Player(startPos != null ? startPos : new Position(WIDTH / 2, HEIGHT / 2));
+        } else {
+            player.setPosition(startPos != null ? startPos : new Position(WIDTH / 2, HEIGHT / 2));
+            player.addTrap(1); // Give ammo on new level
+        }
+
+        // Main Level Loop
+        boolean levelActive = true;
+
+        // Final Level Logic: Change exit to Open Door
+        if (level >= 5 && exitPos != null) { // Assuming 5 levels
+             staticWorld[exitPos.x][exitPos.y] = Tileset.UNLOCKED_DOOR;
+        }
+
+        while (levelActive) {
             // Render
-            ter.renderFrame(world);
-            // Draw player (simple overlay for now, or update world array)
-            // Ideally we separate view from model, but for Phase 1 MVP we can hack it
-            // Draw player on top manually using StdDraw content?
-            // Better: update the world array temporarily for rendering.
+            renderGame(staticWorld, monsters, traps);
+            drawHUD(staticWorld, monsters, traps);
+            StdDraw.show(); // Show frame
 
-            // To properly render the player, we usually create a copy of the view
-            // or use specific draw calls. For simplicity:
-            world[playerPos.x][playerPos.y] = Tileset.AVATAR;
-            ter.renderFrame(world);
-            world[playerPos.x][playerPos.y] = Tileset.FLOOR; // Restore after render (hacky)
+            // Check Death
+            if (player.getHealth() <= 0) {
+                 drawDeathScreen();
+                 return false;
+            }
 
+            // Input
             if (StdDraw.hasNextKeyTyped()) {
                 char c = Character.toUpperCase(StdDraw.nextKeyTyped());
-                int dx = 0;
-                int dy = 0;
+                if (c == ':') {
+                     // Check for Quit command :Q
+                     while (!StdDraw.hasNextKeyTyped()) {
+                         // Wait for next key for combo
+                         StdDraw.pause(10);
+                     }
+                     if (Character.toUpperCase(StdDraw.nextKeyTyped()) == 'Q') {
+                         // Save and Quit logic here
+                         return false;
+                     }
+                } else if (c == 'H') {
+                    player.usePotion();
+                } else if (c == 'P') {
+                    if (player.placeTrap()) {
+                        traps.add(new Trap(player.getPosition()));
+                    }
+                }
+
+                // Movement
+                int dx = 0, dy = 0;
                 if (c == 'W') dy = 1;
                 else if (c == 'S') dy = -1;
                 else if (c == 'A') dx = -1;
                 else if (c == 'D') dx = 1;
-                else if (c == ':') {
-                    // check for Q loop
-                     while (true) {
-                        if (StdDraw.hasNextKeyTyped()) {
-                             char c2 = Character.toUpperCase(StdDraw.nextKeyTyped());
-                             if (c2 == 'Q') {
-                                 // Save and Quit logic
-                                 System.exit(0);
-                             } else {
-                                 break;
-                             }
+
+                if (dx != 0 || dy != 0) {
+                    Position newPos = new Position(player.getPosition().x + dx, player.getPosition().y + dy);
+                    TETile targetTile = staticWorld[newPos.x][newPos.y];
+
+                    if (!targetTile.equals(Tileset.WALL) && !targetTile.equals(Tileset.NOTHING)) {
+                        boolean hitMonster = false;
+                        for (Monster m : monsters) {
+                            if (m.getPosition().x == newPos.x && m.getPosition().y == newPos.y) {
+                                hitMonster = true;
+                                player.addScore(10);
+                                m.setPosition(new Position(-1, -1));
+                                m.setActive(false);
+                                break;
+                            }
+                        }
+
+                        if (!hitMonster) {
+                            player.setPosition(newPos);
+
+                            if (exitPos != null && newPos.x == exitPos.x && newPos.y == exitPos.y) {
+                                if (level >= 5) {
+                                    drawWinScreen();
+                                    return false;
+                                }
+                                return true;
+                            }
+
+                            if (targetTile.equals(Tileset.FLOWER)) {
+                                double rand = Math.random();
+                                if (rand < 0.4) {
+                                    player.addPotion(1);
+                                } else if (rand < 0.7) {
+                                    player.addShield(2);
+                                } else {
+                                    player.addTrap(2);
+                                }
+                                player.addScore(50);
+                                staticWorld[newPos.x][newPos.y] = Tileset.FLOOR;
+                            }
+                        }
+
+                        updateMonsters(monsters, traps, rooms, staticWorld);
+                    }
+                }
+            }
+
+            StdDraw.pause(10); // Limit CPU usage
+        }
+        return false;
+    }
+
+    private void drawWinScreen() {
+        StdDraw.clear(Color.BLACK);
+        StdDraw.setPenColor(Color.WHITE);
+        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0, "YOU WIN! Score: " + player.getScore());
+        StdDraw.show();
+        StdDraw.pause(3000);
+    }
+
+    private void drawDeathScreen() {
+        StdDraw.clear(Color.BLACK);
+        StdDraw.setPenColor(Color.RED);
+        Font font = new Font("Monaco", Font.BOLD, 60);
+        StdDraw.setFont(font);
+        StdDraw.text(WIDTH / 2.0, HEIGHT / 2.0, "YOU DIED");
+        StdDraw.show();
+        StdDraw.pause(3000);
+    }
+
+    private void updateMonsters(List<Monster> monsters, List<Trap> traps, List<RectangularRoom> rooms, TETile[][] world) {
+        // Activate monsters
+        RectangularRoom playerRoom = null;
+        for (RectangularRoom room : rooms) {
+            if (room.contains(player.getPosition())) {
+                playerRoom = room;
+                break;
+            }
+        }
+
+        for (Monster m : monsters) {
+            if (!m.isActive()) {
+                // Check if player is in same room OR within REDUCED distance
+                if (playerRoom != null && playerRoom.contains(m.getPosition())) {
+                    m.setActive(true);
+                } else if (Math.abs(m.getPosition().x - player.getPosition().x) + Math.abs(m.getPosition().y - player.getPosition().y) < 5) {
+                     // Reduced Proximity activation (Manhattan dist < 5)
+                     m.setActive(true);
+                }
+            }
+
+            if (m.isActive()) {
+                // Peek next move
+                int dx = Integer.compare(player.getPosition().x, m.getPosition().x);
+                int dy = Integer.compare(player.getPosition().y, m.getPosition().y);
+
+                // If next move is player, attack
+                if (m.getPosition().x + dx == player.getPosition().x && m.getPosition().y == player.getPosition().y) {
+                    player.takeDamage(1);
+                    // Don't move
+                } else if (dx == 0 && m.getPosition().y + dy == player.getPosition().y) {
+                    // Try Y move if X is aligned (or X didn't move)
+                    player.takeDamage(1);
+                    // Don't move
+                } else {
+                     // Check actual pathfinding logic from Monster class more accurately?
+                     // Currently Monster.moveTowards just updates position.
+                     // We need to change Monster logic or pre-calculate here.
+                     // Making Monster NOT step on player:
+
+                     // Saving old pos
+                     int oldX = m.getPosition().x;
+                     int oldY = m.getPosition().y;
+
+                     m.moveTowards(player.getPosition(), world);
+
+                     // If moved onto player, revert and attack
+                     if (m.getPosition().x == player.getPosition().x && m.getPosition().y == player.getPosition().y) {
+                         m.setPosition(new Position(oldX, oldY));
+                         player.takeDamage(1);
+                     }
+                }
+
+                // Check trap collision
+                for (int i = 0; i < traps.size(); i++) {
+                    Trap t = traps.get(i);
+                    if (m.getPosition().x == t.getPosition().x && m.getPosition().y == t.getPosition().y) {
+                        m.setActive(false); // Kill monster logic needs refinement?
+                        // For now just teleport away or remove?
+                        // I need to remove monster but iterating list safely.
+                        // I will mark it inactive and handle removal later or just keep inactive.
+                        // Ideally remove from list.
+                        m.setPosition(new Position(-1, -1)); // Void
+                        t.decreaseDurability();
+                        if (t.getDurability() <= 0) {
+                             traps.remove(i);
+                             i--;
                         }
                     }
                 }
 
-                // Move check
-                if (!world[playerPos.x + dx][playerPos.y + dy].equals(Tileset.WALL)) {
-                    playerPos = new Position(playerPos.x + dx, playerPos.y + dy);
+                if (m.getPosition().x == player.getPosition().x && m.getPosition().y == player.getPosition().y) {
+                    player.takeDamage(1);
                 }
             }
+        }
+        monsters.removeIf(m -> m.getPosition().x == -1); // Remove dead monsters
+    }
+
+    private void renderGame(TETile[][] staticWorld, List<Monster> monsters, List<Trap> traps) {
+        // Create temporary view
+        TETile[][] view = new TETile[WIDTH][HEIGHT];
+        for (int x = 0; x < WIDTH; x++) {
+            System.arraycopy(staticWorld[x], 0, view[x], 0, HEIGHT);
+        }
+
+        // Draw traps
+        for (Trap t : traps) {
+             view[t.getPosition().x][t.getPosition().y] = t.getAppearance();
+        }
+
+        // Draw monsters
+        for (Monster m : monsters) {
+            view[m.getPosition().x][m.getPosition().y] = m.getAppearance();
+        }
+
+        // Draw player
+        view[player.getPosition().x][player.getPosition().y] = player.getAppearance();
+
+        ter.renderFrame(view, false); // Don't show yet
+    }
+
+    private void drawHUD(TETile[][] world, List<Monster> monsters, List<Trap> traps) {
+        StdDraw.setPenColor(Color.WHITE);
+        StdDraw.textLeft(1, HEIGHT - 1, "HP: " + player.getHealth() + " | Shld: " + player.getShield() + " | Pot: " + player.getPotionCount() + " | Trap: " + player.getTrapCount());
+        StdDraw.textRight(WIDTH - 1, HEIGHT - 1, "Level: " + level);
+        StdDraw.line(0, HEIGHT - 2, WIDTH, HEIGHT - 2);
+
+        // Mouse Hover
+        int mouseX = (int) StdDraw.mouseX();
+        int mouseY = (int) StdDraw.mouseY();
+
+        if (mouseX >= 0 && mouseX < WIDTH && mouseY >= 0 && mouseY < HEIGHT) {
+             String description = world[mouseX][mouseY].description();
+             // Check entities
+             if (player.getPosition().x == mouseX && player.getPosition().y == mouseY) description = "Player";
+             for (Monster m : monsters) {
+                  if (m.getPosition().x == mouseX && m.getPosition().y == mouseY) description = "Monster HP: " + 3; // Hardcoded HP for now
+             }
+             for (Trap t : traps) {
+                  if (t.getPosition().x == mouseX && t.getPosition().y == mouseY) description = "Trap";
+             }
+
+             StdDraw.text(WIDTH / 2.0, HEIGHT - 1, description);
         }
     }
 

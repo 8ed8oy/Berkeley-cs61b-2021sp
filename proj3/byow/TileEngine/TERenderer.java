@@ -84,6 +84,10 @@ public class TERenderer {
      * @param world the 2D TETile[][] array to render
      */
     public void renderFrame(TETile[][] world) {
+         renderFrame(world, true);
+    }
+
+    public void renderFrame(TETile[][] world, boolean show) {
         int numXTiles = world.length;
         int numYTiles = world[0].length;
         StdDraw.clear(new Color(0, 0, 0));
@@ -96,6 +100,8 @@ public class TERenderer {
                 world[x][y].draw(x + xOffset, y + yOffset);
             }
         }
-        StdDraw.show();
+        if (show) {
+            StdDraw.show();
+        }
     }
 }
