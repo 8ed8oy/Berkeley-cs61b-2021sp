@@ -1,11 +1,9 @@
 package byow.lab12;
-import org.junit.Test;
-import static org.junit.Assert.*;
 
-import byow.TileEngine.TERenderer;
+import byow.Core.Hexagon;
 import byow.TileEngine.TETile;
 import byow.TileEngine.Tileset;
-import byow.lab12.Hexagon;
+import byow.TileEngine.TERenderer;
 
 import java.util.Random;
 
@@ -20,11 +18,19 @@ public class HexWorld {
     private static final Random RANDOM = new Random(SEED);
 
     public static void main(String[] args) {
-        TETile[][] HexgonTile = worldGenerator.creatNothingTile(WIDTH, HEIGHT);
+        TERenderer ter = new TERenderer();
+        ter.initialize(WIDTH, HEIGHT);
 
-        Hexagon.fillWithOneHexagon(HexgonTile, 5, 25, 25, Tileset.WALL);
+        TETile[][] world = new TETile[WIDTH][HEIGHT];
+        for (int x = 0; x < WIDTH; x += 1) {
+            for (int y = 0; y < HEIGHT; y += 1) {
+                world[x][y] = Tileset.NOTHING;
+            }
+        }
 
-        worldGenerator.mapRender(HexgonTile);
+        Hexagon.fillWithOneHexagon(world, 5, 25, 25, Tileset.WALL);
+
+        ter.renderFrame(world);
     }
 
 
