@@ -1,0 +1,33 @@
+# 引入标准定义（如日期正则等）
+I definitions.inc
+
+# 1. 初始化 Gitlet
+> init
+<<<
+
+# 2. 创建一个文件 wug.txt
+# 语法: + [文件名] [源文件内容]
+# 这里将 testing/src/wug.txt 的内容复制名为 wug.txt 的文件
++ wug.txt wug.txt
+
+# 3. 将文件添加到暂存区
+> add wug.txt
+<<<
+
+# 4. 提交文件
+> commit "version 1 of wug.txt"
+<<<
+
+# === 至此，准备工作完成，当前状态已包含一个提交 ===
+
+# 接下来可以编写你的具体测试逻辑，例如修改文件并再次 add
++ wug.txt notwug.txt
+> add wug.txt
+<<<
+> commit "version 2 of wug.txt"
+<<<
+
+# 或者验证 checkout
+> checkout -- wug.txt
+<<<
+= wug.txt notwug.txt

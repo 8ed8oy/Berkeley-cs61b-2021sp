@@ -1,0 +1,22 @@
+# Branch checkout switches file content
+I definitions.inc
+> init
+<<<
++ wug.txt wug.txt
+> add wug.txt
+<<<
+> commit "c1"
+<<<
+> branch dev
+<<<
++ wug.txt notwug.txt
+> add wug.txt
+<<<
+> commit "c2"
+<<<
+> checkout dev
+<<<
+= wug.txt wug.txt
+> checkout master
+<<<
+= wug.txt notwug.txt
