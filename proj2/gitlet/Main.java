@@ -1,11 +1,12 @@
 package gitlet;
 
 import java.io.File;
+import java.util.Locale;
 
 import static gitlet.GitletException.validateNumArgs;
 
 /** Driver class for Gitlet, a subset of the Git version-control system.
- *  @author TODO
+ *  @author Fangheng Wang
  */
 public class Main {
 
@@ -14,6 +15,7 @@ public class Main {
      * java gitlet.Main
      */
     public static void main(String[] args) {
+        Locale.setDefault(Locale.US);
         if (args.length == 0) {
             System.out.println("Please enter a command.");
             return;

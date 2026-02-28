@@ -22,5 +22,4 @@ class GitletException extends RuntimeException {
             throw new RuntimeException(String.format("Invalid number of arguments for: %s.", cmd));
         }
     }
-
 }

@@ -1,11 +1,11 @@
-package gitlet;
+package gitlet.models;
 
-import java.io.File;
+import gitlet.Utils;
+
 import java.io.Serializable;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TreeMap;
@@ -53,12 +53,6 @@ public class Commit implements Serializable {
         return dateFormat.format(date);
     }
 
-    public void save(){
-        String commitID = Utils.sha1(serialize(this));
-        File commitFile = Utils.join(Repository.COMMITS_DIR, commitID);
-        Utils.writeObject(commitFile, this);
-    }
-
     public TreeMap<String, String> getBlobsID() {
         return this.blobsID;
     }
@@ -76,7 +70,6 @@ public class Commit implements Serializable {
             throw new IllegalArgumentException("blobsID cannot be null");
         }
         this.blobsID = new TreeMap<>(blobsID);
-        this.save();
     }
 
     public String getParent() {return this.parent;}
