@@ -21,3 +21,6 @@
 guitarhero:数据结构练习,实现简单吉他模拟
 gitlet: 软件工程练习,实现简化版git,第二版已发布到该仓库github release
 byow:算法练习,实现瓦片世界生成以及自创地牢类游戏,贴图素材待添加.
+
+BYOW Demo
+<video src="byow_demo_small.mp4" controls width="600"></video>
