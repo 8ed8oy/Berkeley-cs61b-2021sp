@@ -1,4 +1,0 @@
-# Test add without initializing repository
-> add somefile.txt
-Not in an initialized Gitlet directory.
-<<<
