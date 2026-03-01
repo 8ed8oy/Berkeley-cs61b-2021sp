@@ -23,4 +23,4 @@ gitlet: 软件工程练习,实现简化版git,第二版已发布到该仓库gith
 byow:算法练习,实现瓦片世界生成以及自创地牢类游戏,贴图素材待添加.
 
 BYOW Demo
-<video src="byow_demo_small.mp4" controls width="600"></video>
+https://github.com/8ed8oy/Berkeley-cs61b-2021sp/raw/master/byow_demo_small.mp4
