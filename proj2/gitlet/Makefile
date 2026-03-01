@@ -35,7 +35,11 @@ LIB = ../../library-sp21/javalib/*
 CPATH = "$(LIB):..:$(CLASSPATH):;$(LIB);..;$(CLASSPATH)"
 
 # All .java files in this directory and subdirectories.
+ifeq ($(OS),Windows_NT)
+SRCS := $(shell powershell -NoProfile -Command "Get-ChildItem -Recurse -Filter *.java | ForEach-Object { $$_.FullName -replace '\\\\','/' }")
+else
 SRCS := $(shell find . -name '*.java')
+endif
 
 .PHONY: default check clean
 

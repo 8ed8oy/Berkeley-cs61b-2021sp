@@ -13,8 +13,8 @@ import java.util.List;
 public class Engine {
     TERenderer ter = new TERenderer();
     /* Feel free to change the width and height. */
-    public static final int WIDTH = 120;
-    public static final int HEIGHT = 60;
+    public static final int WIDTH = 100;
+    public static final int HEIGHT = 50;
 
     private static final int TILE_SIZE = 16;
 
@@ -196,18 +196,20 @@ public class Engine {
                     TETile targetTile = staticWorld[newPos.x][newPos.y];
 
                     if (!targetTile.equals(Tileset.WALL) && !targetTile.equals(Tileset.NOTHING)) {
-                        boolean hitMonster = false;
+                        Monster collidedMonster = null;
                         for (Monster m : monsters) {
                             if (m.getPosition().x == newPos.x && m.getPosition().y == newPos.y) {
-                                hitMonster = true;
-                                player.addScore(10);
-                                m.setPosition(new Position(-1, -1));
-                                m.setActive(false);
+                                collidedMonster = m;
                                 break;
                             }
                         }
 
-                        if (!hitMonster) {
+                        if (collidedMonster != null) {
+                            // Player defeats monster on contact but still takes collision damage.
+                            player.takeDamage(1);
+                            monsters.remove(collidedMonster);
+                            player.setPosition(newPos);
+                        } else {
                             player.setPosition(newPos);
 
                             if (exitPos != null && newPos.x == exitPos.x && newPos.y == exitPos.y) {
