@@ -1,13 +1,3 @@
-*
-!*/
-!**.java
-!**.txt
-!**.json
-!**/pom.xml
-!.fatweleminus
-!.gitignore
-!library-sp21/
-!foods.csv
 *.class
 *.log
 *.ctxt
